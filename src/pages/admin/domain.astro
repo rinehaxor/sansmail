@@ -1,0 +1,312 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { db } from '../../db/index';
+import { authDomains } from '../../db/schema';
+import { eq } from 'drizzle-orm';
+import { verifyToken, COOKIE_NAME } from '../../lib/jwt';
+
+// JWT auth guard
+const token = Astro.cookies.get(COOKIE_NAME)?.value;
+const admin = token ? verifyToken(token) : null;
+
+if (!admin) {
+    return Astro.redirect("/admin/login");
+}
+
+let message = "";
+let isError = false;
+
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("action");
+        const domainName = formData.get("domain")?.toString().trim();
+
+        if (action === "add" && domainName) {
+            await db.insert(authDomains).values({ name: domainName });
+            message = `Domain "${domainName}" berhasil ditambahkan!`;
+        } else if (action === "delete" && domainName) {
+            await db.delete(authDomains).where(eq(authDomains.name, domainName));
+            message = `Domain "${domainName}" berhasil dihapus!`;
+        }
+    } catch (e: any) {
+        message = `Gagal: Domain mungkin sudah ada.`;
+        isError = true;
+    }
+}
+
+const domainsList = await db.select().from(authDomains);
+---
+
+<Layout title="Admin Panel - SansMail">
+    <div class="page-wrapper">
+        <main class="container">
+            <!-- Top Bar -->
+            <div class="topbar">
+                <div class="topbar-brand">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <span class="brand-name">SansMail Admin</span>
+                </div>
+                <div class="topbar-right">
+                    <span class="admin-info">👤 {admin.username}</span>
+                    <button class="btn-logout" id="logout-btn">Logout</button>
+                </div>
+            </div>
+
+            <!-- Flash Message -->
+            {message && (
+                <div class={`flash-msg ${isError ? 'flash-error' : 'flash-success'}`}>{message}</div>
+            )}
+
+            <!-- Add Domain Form -->
+            <section class="card">
+                <h2 class="section-title">Tambah Domain Baru</h2>
+                <form method="POST" class="add-form">
+                    <input type="hidden" name="action" value="add" />
+                    <input type="text" name="domain" placeholder="contoh: temp.tokosans.com" required class="input-field" />
+                    <button type="submit" class="btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Tambah
+                    </button>
+                </form>
+            </section>
+
+            <!-- Domain List -->
+            <section class="card">
+                <div class="list-header">
+                    <h2 class="section-title" style="margin-bottom: 0;">Domain Aktif</h2>
+                    <span class="badge">{domainsList.length} domain</span>
+                </div>
+                <div class="divider"></div>
+
+                {domainsList.length === 0 ? (
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <p>Belum ada domain. Sistem pakai <code>sansmail.temp</code> sebagai default.</p>
+                    </div>
+                ) : (
+                    <ul class="domain-list">
+                        {domainsList.map(d => (
+                            <li class="domain-item">
+                                <div class="domain-name">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                                    <span>{d.name}</span>
+                                </div>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="delete" />
+                                    <input type="hidden" name="domain" value={d.name} />
+                                    <button type="submit" class="btn-delete">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+                                        Hapus
+                                    </button>
+                                </form>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+            
+            <div class="footer-link">
+                <a href="/">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Lihat tampilan user
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <style>
+        .page-wrapper {
+            display: flex;
+            justify-content: center;
+            padding: 0 1rem 4rem;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 700px;
+            padding-top: 2rem;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .admin-info {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .btn-logout {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+        .btn-logout:hover { background: #ef4444; color: #fff; }
+
+        .flash-msg {
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+        }
+        .flash-success { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
+        .flash-error { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 1.25rem;
+        }
+        .add-form {
+            display: flex;
+            gap: 0.75rem;
+        }
+        @media (max-width: 500px) { .add-form { flex-direction: column; } }
+        .input-field {
+            flex: 1;
+            background: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 0.875rem 1rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        .list-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+        }
+        .badge {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .divider { height: 1px; background: var(--border-color); margin-bottom: 1.25rem; }
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .empty-state code {
+            background: var(--bg-base);
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .domain-list { list-style: none; padding: 0; }
+        .domain-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            background: var(--bg-base);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            transition: border-color 0.2s;
+        }
+        .domain-item:hover { border-color: rgba(59, 130, 246, 0.3); }
+        .domain-name {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 500;
+        }
+        .btn-delete {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid transparent;
+            padding: 0.4rem 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.875rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+        .btn-delete:hover { background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.2); }
+        .footer-link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .footer-link a {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.2s;
+        }
+        .footer-link a:hover { color: var(--text-main); }
+    </style>
+
+    <script>
+        document.getElementById('logout-btn')?.addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/admin/login';
+        });
+    </script>
+</Layout>

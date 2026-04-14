@@ -1,0 +1,210 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { verifyToken, COOKIE_NAME } from '../../lib/jwt';
+
+const token = Astro.cookies.get(COOKIE_NAME)?.value;
+const admin = token ? verifyToken(token) : null;
+
+// If already logged in, redirect to admin
+if (admin) {
+    return Astro.redirect("/admin/domain");
+}
+---
+
+<Layout title="Admin Login - SansMail">
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <h1>Admin Login</h1>
+                <p>Masukkan kredensial untuk mengakses panel admin</p>
+            </div>
+
+            <div id="alert-error" class="alert alert-error hidden"></div>
+
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <input id="username" type="text" name="username" placeholder="Masukkan username" required autocomplete="username" />
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input id="password" type="password" name="password" placeholder="Masukkan password" required autocomplete="current-password" />
+                </div>
+                <button type="submit" class="btn-login" id="btn-submit">
+                    <span id="btn-text">Masuk</span>
+                    <span id="btn-loading" class="hidden">
+                        <svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                    </span>
+                </button>
+            </form>
+
+            <div class="back-link">
+                <a href="/">&larr; Kembali ke halaman utama</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .auth-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+        .auth-header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+        .auth-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+        .alert {
+            padding: 0.9rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .hidden { display: none !important; }
+        .input-group {
+            margin-bottom: 1.25rem;
+        }
+        .input-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        .input-group input {
+            width: 100%;
+            background: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 0.875rem 1rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .btn-login {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.95rem;
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            transition: background 0.2s;
+        }
+        .btn-login:hover { background: var(--primary-hover); }
+        .btn-login:disabled { opacity: 0.7; cursor: not-allowed; }
+        .spin-icon {
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .back-link {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+        .back-link a {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .back-link a:hover { color: var(--text-main); }
+    </style>
+
+    <script>
+        const form = document.getElementById('login-form') as HTMLFormElement;
+        const errorDiv = document.getElementById('alert-error')!;
+        const btnSubmit = document.getElementById('btn-submit') as HTMLButtonElement;
+        const btnText = document.getElementById('btn-text')!;
+        const btnLoading = document.getElementById('btn-loading')!;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorDiv.classList.add('hidden');
+            btnSubmit.disabled = true;
+            btnText.classList.add('hidden');
+            btnLoading.classList.remove('hidden');
+
+            const username = (document.getElementById('username') as HTMLInputElement).value;
+            const password = (document.getElementById('password') as HTMLInputElement).value;
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    window.location.href = '/admin/domain';
+                } else {
+                    errorDiv.textContent = data.error || "Login gagal!";
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch {
+                errorDiv.textContent = "Koneksi ke server gagal.";
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btnSubmit.disabled = false;
+                btnText.classList.remove('hidden');
+                btnLoading.classList.add('hidden');
+            }
+        });
+    </script>
+</Layout>

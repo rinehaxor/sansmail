@@ -1,0 +1,67 @@
+---
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Secure disposable email" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+		<title>{title}</title>
+        <style is:global>
+            :root {
+                --bg-base: #0f172a; /* Slate 900 */
+                --bg-card: #1e293b; /* Slate 800 */
+                --bg-input: #334155; /* Slate 700 */
+                --text-main: #f8fafc; /* Slate 50 */
+                --text-muted: #94a3b8; /* Slate 400 */
+                --primary: #3b82f6; /* Blue 500 */
+                --primary-hover: #2563eb; /* Blue 600 */
+                --border-color: #334155;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                font-family: 'Inter', system-ui, sans-serif;
+                background-color: var(--bg-base);
+                color: var(--text-main);
+                -webkit-font-smoothing: antialiased;
+            }
+            /* Clean scrollbar */
+            ::-webkit-scrollbar {
+                width: 8px;
+            }
+            ::-webkit-scrollbar-track {
+                background: var(--bg-base);
+            }
+            ::-webkit-scrollbar-thumb {
+                background: var(--bg-input);
+                border-radius: 4px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: var(--text-muted);
+            }
+            /* Smooth transitions */
+            a, button, input {
+                transition: all 0.2s ease-in-out;
+            }
+            .hidden { display: none !important; }
+        </style>
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>
