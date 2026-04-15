@@ -513,12 +513,34 @@ if (!currentInboxId) {
             line-height: 1.6;
             color: var(--text-muted);
             background-color: var(--bg-base);
-            padding: 1.25rem;
             border-radius: 8px;
             border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .email-iframe {
+            width: 100%;
+            min-height: 200px;
+            max-height: 400px;
+            border: none;
+            display: block;
+            background: #fff;
+            border-radius: 8px;
+        }
+        .body-pre {
+            padding: 1.25rem;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
             max-height: 300px;
             overflow-y: auto;
-            white-space: pre-wrap;
+        }
+        .no-content {
+            display: block;
+            padding: 1.25rem;
+            color: var(--text-muted);
+            font-style: italic;
         }
     </style>
 
@@ -539,9 +561,71 @@ if (!currentInboxId) {
             });
         }
 
-        setTimeout(() => {
-            window.location.reload();
-        }, 5000); // Poll every 5 seconds
+        // ── AJAX Polling: hanya update inbox, bukan reload halaman ──
+        const inboxId = new URLSearchParams(window.location.search).get('id');
+        const emailListContainer = document.querySelector('.email-list') as HTMLElement;
+        const badgeEl = document.querySelector('.badge') as HTMLElement;
+
+        function timeAgo(dateStr: string): string {
+            const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            return `${Math.floor(diff / 3600)}h ago`;
+        }
+
+        function renderEmails(emailData: any[]) {
+            badgeEl.textContent = String(emailData.length);
+            if (emailData.length === 0) {
+                emailListContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                        </div>
+                        <h3>Your inbox is empty</h3>
+                        <p>Waiting for incoming messages</p>
+                    </div>`;
+                return;
+            }
+            emailListContainer.innerHTML = `<div class="emails">${emailData.map(msg => {
+                const initial = (msg.sender || '?').charAt(0).toUpperCase();
+                const sender = msg.sender || 'Unknown';
+                const subject = msg.subject || '(No Subject)';
+                const body = msg.htmlBody
+                    ? `<iframe class="email-iframe" srcdoc="${msg.htmlBody.replace(/"/g, '&quot;')}" sandbox="allow-same-origin" scrolling="auto"></iframe>`
+                    : msg.textBody
+                    ? `<pre class="body-pre">${msg.textBody}</pre>`
+                    : '<span class="no-content">No content.</span>';
+                const time = timeAgo(msg.receivedAt || msg.received_at || '');
+                return `
+                    <div class="email-item">
+                        <div class="email-meta">
+                            <div class="sender-info">
+                                <div class="avatar">${initial}</div>
+                                <span class="sender">${sender}</span>
+                            </div>
+                            <span class="time">${time}</span>
+                        </div>
+                        <h3 class="subject">${subject}</h3>
+                        <div class="body-content">${body}</div>
+                    </div>`;
+            }).join('')}</div>`;
+        }
+
+        let lastCount = -1;
+        async function pollInbox() {
+            try {
+                const res = await fetch(`/api/inbox/emails?id=${inboxId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.emails.length !== lastCount) {
+                    lastCount = data.emails.length;
+                    renderEmails(data.emails);
+                }
+            } catch {}
+        }
+
+        pollInbox();
+        setInterval(pollInbox, 5000);
 
         // ── Custom Email Modal ──
         const domains: string[] = JSON.parse(
