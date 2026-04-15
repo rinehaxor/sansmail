@@ -544,6 +544,107 @@ if (!currentInboxId) {
         }
     </style>
 
+    <style is:global>
+        .emails {
+            display: flex;
+            flex-direction: column;
+        }
+        .email-item {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .email-item:last-child {
+            border-bottom: none;
+        }
+        .email-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .sender-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .avatar {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .sender {
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+        .time {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            margin-left: 1rem;
+        }
+        .subject {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-main);
+        }
+        .body-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            background-color: var(--bg-base);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .email-iframe {
+            width: 100%;
+            min-height: 180px;
+            max-height: 400px;
+            border: none;
+            display: block;
+            background: #fff;
+        }
+        .body-pre {
+            padding: 1.25rem;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+            color: var(--text-muted);
+        }
+        .no-content {
+            display: block;
+            padding: 1.25rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .empty-state h3 {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--text-main);
+            margin: 1rem 0 0.5rem;
+        }
+    </style>
+
     <script>
         const btn = document.getElementById('copy-btn');
         const emailSpan = document.getElementById('email-address');
