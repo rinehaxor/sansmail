@@ -58,7 +58,8 @@ exports.register = function () {
 
 // Cek apakah domain penerima terdaftar
 exports.check_domain = function (next, connection, params) {
-    const DENY = 901; // Haraka v3 DENY constant
+    const OK = 906;   // Haraka v3: terima recipient
+    const DENY = 901; // Haraka v3: tolak recipient
     try {
         const rcpt = params[0];
         const domain = rcpt.host;
@@ -70,10 +71,10 @@ exports.check_domain = function (next, connection, params) {
         }
 
         connection.loginfo(`[sqlite_inserter] Domain valid: ${domain}`);
-        next();
+        next(OK); // PENTING: harus next(OK) bukan next() agar Haraka tidak reject dengan 550
     } catch (err) {
         connection.logerror('[sqlite_inserter] Gagal cek domain: ' + err.message);
-        next(); // fail-open
+        next(OK); // fail-open: tetap terima
     }
 };
 
