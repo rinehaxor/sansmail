@@ -53,7 +53,7 @@ function postToWebhook(data) {
 exports.register = function () {
     this.register_hook('rcpt', 'check_domain');
     this.register_hook('data', 'enable_body_parse');
-    this.register_hook('data_post', 'save_email');
+    this.register_hook('queue', 'save_email'); // queue hook: return OK=906 agar Haraka balas 250 (bukan 451) ke SES → tidak ada retry/duplicate
 };
 
 // Cek apakah domain penerima terdaftar
@@ -83,11 +83,12 @@ exports.enable_body_parse = function (next, connection) {
     next();
 };
 
-// Simpan email via HTTP POST ke Astro webhook
+// Simpan email via HTTP POST ke Astro webhook (hook: queue)
 exports.save_email = function (next, connection) {
+    const OK = 906; // Return OK agar Haraka balas 250 ke sender, mencegah SES retry/duplicate
     try {
         const txn = connection.transaction;
-        if (!txn) return next();
+        if (!txn) return next(OK);
 
         const fromStr = txn.mail_from.address();
         const subjectStr = (txn.header.get('subject') || '(No Subject)').trim();
@@ -122,11 +123,11 @@ exports.save_email = function (next, connection) {
         });
 
         Promise.all(promises)
-            .then(() => next())
-            .catch(() => next());
+            .then(() => next(OK))  // OK = 250 ke sender, SES tidak retry
+            .catch(() => next(OK)); // Tetap OK meski webhook gagal, cegah duplicate
 
     } catch (err) {
         connection.logerror('[sqlite_inserter] Error di save_email: ' + err.message);
-        next();
+        next(OK); // Selalu OK untuk cegah retry
     }
 };
