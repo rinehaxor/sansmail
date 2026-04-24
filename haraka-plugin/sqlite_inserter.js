@@ -1,33 +1,67 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const http = require('http');
 
-// Sesuaikan path ini dengan letak instalasi aplikasi Astro kamu di Contabo nanti
+// Path database untuk domain & inbox check saja
 const dbPath = process.env.SQLITE_DB_PATH || path.resolve(__dirname, '../../database.sqlite');
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
 
-// Statement yang di-prepare sekali agar efisien
+// Hanya untuk cek domain (read-only)
 const stmtDomain = db.prepare('SELECT name FROM domains WHERE name = ? LIMIT 1');
-const stmtFind   = db.prepare('SELECT id FROM inboxes WHERE email = ? LIMIT 1');
-const stmtInsert = db.prepare(
-    'INSERT INTO emails (inbox_id, sender, subject, text_body, html_body) VALUES (?, ?, ?, ?, ?)'
-);
+
+// URL Astro app untuk simpan email via webhook
+const ASTRO_PORT = process.env.ASTRO_PORT || '4321';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'haraka-internal';
+
+function postToWebhook(data) {
+    return new Promise((resolve, reject) => {
+        const body = JSON.stringify(data);
+        const options = {
+            hostname: '127.0.0.1',
+            port: parseInt(ASTRO_PORT),
+            path: '/api/webhook',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(body),
+                'X-Webhook-Secret': WEBHOOK_SECRET,
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let responseData = '';
+            res.on('data', chunk => responseData += chunk);
+            res.on('end', () => {
+                try { resolve(JSON.parse(responseData)); }
+                catch (e) { resolve({ raw: responseData }); }
+            });
+        });
+
+        req.on('error', reject);
+        req.setTimeout(10000, () => {
+            req.destroy();
+            reject(new Error('Webhook timeout after 10s'));
+        });
+
+        req.write(body);
+        req.end();
+    });
+}
 
 exports.register = function () {
-    // Hook 'rcpt': cek apakah domain penerima terdaftar di database
     this.register_hook('rcpt', 'check_domain');
-    // Hook 'data': aktifkan parsing MIME body, lalu langsung panggil next()
     this.register_hook('data', 'enable_body_parse');
-    // Hook 'data_post': dipanggil SETELAH semua data diterima & body sudah diparsing
     this.register_hook('data_post', 'save_email');
 };
 
-// Cek apakah domain penerima valid (ada di tabel domains di SQLite)
+// Cek apakah domain penerima terdaftar
 exports.check_domain = function (next, connection, params) {
-    const DENY = 5; // Haraka: tolak koneksi
+    const DENY = 901; // Haraka v3 DENY constant
     try {
         const rcpt = params[0];
-        const domain = rcpt.host; // bagian setelah '@'
+        const domain = rcpt.host;
 
         const row = stmtDomain.get(domain);
         if (!row) {
@@ -39,15 +73,16 @@ exports.check_domain = function (next, connection, params) {
         next();
     } catch (err) {
         connection.logerror('[sqlite_inserter] Gagal cek domain: ' + err.message);
-        next(); // kalau error query, biarkan lanjut (fail-open)
+        next(); // fail-open
     }
 };
 
 exports.enable_body_parse = function (next, connection) {
     connection.transaction.parse_body = true;
-    next(); // PENTING: langsung lanjut, jangan tunggu stream
+    next();
 };
 
+// Simpan email via HTTP POST ke Astro webhook
 exports.save_email = function (next, connection) {
     try {
         const txn = connection.transaction;
@@ -70,19 +105,27 @@ exports.save_email = function (next, connection) {
             }
         }
 
-        txn.rcpt_to.forEach(recp => {
-            const row = stmtFind.get(recp.address());
-            if (row) {
-                stmtInsert.run(row.id, fromStr, subjectStr, textBody, htmlBody);
-                connection.loginfo(`[sqlite_inserter] Email disimpan untuk ${recp.address()} dari ${fromStr}`);
-            } else {
-                connection.loginfo(`[sqlite_inserter] Inbox tidak ditemukan untuk ${recp.address()}, dilewati.`);
-            }
+        const promises = txn.rcpt_to.map(recp => {
+            const toAddress = recp.address();
+            return postToWebhook({
+                to: toAddress,
+                from: fromStr,
+                subject: subjectStr,
+                textBody,
+                htmlBody,
+            }).then(result => {
+                connection.loginfo(`[sqlite_inserter] Email disimpan untuk ${toAddress}: ${JSON.stringify(result)}`);
+            }).catch(err => {
+                connection.logerror(`[sqlite_inserter] Gagal simpan email untuk ${toAddress}: ${err.message}`);
+            });
         });
 
-        next();
+        Promise.all(promises)
+            .then(() => next())
+            .catch(() => next());
+
     } catch (err) {
-        connection.logerror('[sqlite_inserter] Gagal simpan email ke DB: ' + err.message);
+        connection.logerror('[sqlite_inserter] Error di save_email: ' + err.message);
         next();
     }
 };
