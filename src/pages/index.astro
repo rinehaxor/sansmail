@@ -13,11 +13,18 @@ let currentEmails = [];
 const dbDomains = await db.select().from(authDomains);
 
 if (!currentInboxId) {
-    const randomHash = Math.random().toString(36).substring(2, 8);
+    // Generate human-like email (no underscores)
+    const firstNames = ['andi','budi','citra','dani','eka','fira','gita','hana','irma','joko','kiki','lina','mira','niko','oka','pita','rani','sari','tari','udin','vina','wati','yogi','zara','bayu','dewi','evan','faiz','gilang','hendra','indra','jaya','kevin','laras','maya','nadia','oscar','putri','reza','siska','tono','ulfa','vera','wira','yuda','zahra','arif','bella','ciko','dita'];
+    const lastNames = ['pratama','santoso','wijaya','kusuma','rahayu','saputra','wibowo','nugroho','hidayat','setiawan','lestari','purnama','hasanah','maulana','fitriani','susanto','kurniawan','nuraini','ramadan','hartono','prastowo','andriani','mahendra','sulistyo','oktavia','permana','yuliana','fahrizal','anggraeni','suryana'];
+    const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const num = Math.floor(Math.random() * 90) + 10; // 10–99
+    const username = `${fn}.${ln}${num}`;
+    const randomHash = Math.random().toString(36).substring(2, 10);
     // Multi-domain support (Dynamic from Database)
     const availableDomains = dbDomains.length > 0 ? dbDomains.map(d => d.name) : ["sansmail.temp"];
     const randomDomain = availableDomains[Math.floor(Math.random() * availableDomains.length)];
-    const newAddress = `mail_${randomHash}@${randomDomain}`;
+    const newAddress = `${username}@${randomDomain}`;
     
     await db.insert(inboxes).values({
         id: randomHash,
